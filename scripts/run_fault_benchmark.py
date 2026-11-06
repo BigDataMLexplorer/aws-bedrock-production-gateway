@@ -38,12 +38,12 @@ def configure(provider: DeterministicFakeProvider, case: dict) -> InferenceReque
     kind=case["kind"]
     task=TaskType.structured if kind=="malformed_structured" else TaskType.chat
     if kind=="throttle_once":
-        provider.set_plan("t","fast",["throttle","success"])
+        provider.set_plan(case_id,FAST,["throttle","success"])
     elif kind=="timeout_once":
         provider.set_plan(case_id,FAST,["timeout","success"])
     elif kind=="primary_unavailable":
         provider.set_plan(case_id,FAST,["unavailable","unavailable","unavailable"])
-        provider.set_plan("t",STRONG,["success"])
+        provider.set_plan(case_id,STRONG,["success"])
     elif kind=="malformed_structured":
         provider.set_plan(case_id,STRONG,["malformed"])
         provider.set_plan(case_id,FAST,["success"])
@@ -78,7 +78,7 @@ def main() -> None:
         req=configure(naive_provider,case)
         naive_model=STRONG if req.task_type==TaskType.structured else FAST
         ok,malformed=naive_call(naive_provider,req,naive_model)
-        naive_success;+=int(ok)
+        naive_success+=int(ok)
         naive_malformed+=int(malformed)
 
         provider=DeterministicFakeProvider()
@@ -92,7 +92,7 @@ def main() -> None:
             sleep_fn=lambda _:None,
         )
         try:
-            response=gateway.invoke(req,TenantPolicy(allowed_models=frozenset({FAST,STRONG}))
+            response=gateway.invoke(req,TenantPolicy(allowed_models=frozenset({FAST,STRONG})))
             success=True
             resilient_success+=1
             resilient_attempts+=response.attempts
@@ -113,10 +113,15 @@ def main() -> None:
 
     summary={
         "cases":len(cases),
-        "naive_valid_success_rate":round(naive_success?len(cases),4),
-        "resilient_valid_success_rate":round(resilient_success?len(cases),4),
+        "naive_valid_success_rate":round(naive_success/len(cases),4),
+        "resilient_valid_success_rate":round(resilient_success/len(cases),4),
         "naive_malformed_structured_outputs":naive_malformed,
-        "resilient_malformed_structured_outputs":sum(1 for r in rows if r["resilient_success"] and r["kind"]=="malformed_structured" and r["model_id"]==STRONG),
+        "resilient_malformed_structured_outputs":sum(
+            1 for r in rows
+            if r["resilient_success"]
+            and r["kind"]=="malformed_structured"
+            and r["model_id"]==STRONG
+        ),
         "fallback_rate":round(fallback_count/len(cases),4),
         "mean_provider_attempts":round(resilient_attempts/len(cases),3),
         "retryable_faults_recovered":recovered_retryable,
