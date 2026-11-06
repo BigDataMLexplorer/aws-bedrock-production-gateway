@@ -1,0 +1,53 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test-benchmark-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Compile
+        run: python -m compileall -q src scripts tests
+      - name: Tests
+        run: pytest -q
+      - name: Fault benchmark
+        run: PYTHONPATH=src python scripts/run_fault_benchmark.py
+      - name: Benchmark chart
+        run: PYTHONPATH=src python scripts/plot_benchmark.py
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Start API
+        run: |
+          PYTHONPATH=src uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/gateway.log 2>&1 &
+          echo $! >/tmp/gateway.pid
+          python - <<'CHECK'
+          import time, urllib.request
+          for _ in range(60):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=2) as r:
+                      if r.status==200: break
+              except Exception: time.sleep(1)
+          else: raise SystemExit('API did not become healthy')
+          CHECK
+      - name: Capture portfolio assets
+        run: PYTHONPATH=src python scripts/capture_assets.py
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f /tmp/gateway.pid ]; then kill "$(cat /tmp/gateway.pid)" || true; fi
+          if [ -f /tmp/gateway.log ]; then tail -n 100 /tmp/gateway.log; fi
+      - name: Upload portfolio artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bedrock-production-gateway-portfolio
+          path: |
+            artifacts/fault_benchmark.json
+            artifacts/fault_benchmark.png
+            artifacts/gateway_dashboard.png
+            artifacts/architecture_process.png
