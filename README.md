@@ -22,7 +22,7 @@ The public demo uses a deterministic fake provider so tests and benchmarks run w
 - pre-flight tenant/request cost budgets and model allow-lists
 - OpenTelemetry spans without logging raw prompts
 - deterministic fault-injection benchmark
-- Docker + GitHub Actions CI
+- Docker + GitHub Actions CI with reproducible fault benchmark and browser-captured portfolio assets
 
 ## Fault-injection benchmark
 
