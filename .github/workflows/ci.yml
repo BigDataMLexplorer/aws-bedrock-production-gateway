@@ -21,7 +21,7 @@ jobs:
       - name: Benchmark chart
         run: PYTHONPATH=src python scripts/plot_benchmark.py
       - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+        run: python -m playwright install chromium
       - name: Start API
         run: |
           PYTHONPATH=src uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/gateway.log 2>&1 &
